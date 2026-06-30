@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  avatar       String   @default("")
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedBoards    Board[]
+  boardMembers   BoardMember[]
+  assignedCards  Card[]          @relation("CardAssignee")
+  comments       Comment[]
+  attachments    Attachment[]
+  activityLogs   ActivityLog[]
+  notifications  Notification[]
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  cover       String   @default("")
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lists           List[]
+  members         BoardMember[]
+  activityLogs    ActivityLog[]
+  automationRules AutomationRule[]
+}
+
+model BoardMember {
+  id        String   @id @default(cuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER
+  createdAt DateTime @default(now())
+
+  @@unique([boardId, userId])
+}
+
+model List {
+  id        String   @id @default(cuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  title     String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cards Card[]
+}
+
+model Card {
+  id          String    @id @default(cuid())
+  listId      String
+  list        List      @relation(fields: [listId], references: [id], onDelete: Cascade)
+  title       String
+  description String    @default("")
+  position    Int       @default(0)
+  priority    String    @default("NONE") // NONE, LOW, MEDIUM, HIGH, URGENT
+  dueDate     DateTime?
+  assigneeId  String?
+  assignee    User?     @relation("CardAssignee", fields: [assigneeId], references: [id])
+  color       String    @default("")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  labels      CardLabel[]
+  comments    Comment[]
+  attachments Attachment[]
+}
+
+model CardLabel {
+  id     String @id @default(cuid())
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  text   String
+  color  String @default("#3B82F6")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileUrl   String
+  fileSize  Int
+  mimeType  String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  boardId    String
+  board      Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String   // CREATE_CARD, MOVE_CARD, UPDATE_CARD, DELETE_CARD, ADD_COMMENT, etc.
+  targetType String   // CARD, LIST, BOARD, MEMBER
+  targetId   String
+  detail     String   @default("")
+  createdAt  DateTime @default(now())
+}
+
+model AutomationRule {
+  id        String   @id @default(cuid())
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name      String
+  trigger   String   // CARD_MOVED, DUE_DATE_APPROACHING, CARD_CREATED
+  condition String   @default("") // JSON string of conditions
+  action    String   // MOVE_CARD, SET_PRIORITY, ASSIGN_MEMBER, SEND_NOTIFICATION
+  config    String   @default("{}") // JSON config for the action
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model BoardTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  description    String
+  category       String   @default("GENERAL")
+  defaultLists   String   // JSON array of list names
+  createdAt      DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // COMMENT, ASSIGNMENT, INVITATION, DUE_DATE, MENTION
+  message   String
+  isRead    Boolean  @default(false)
+  link      String   @default("")
+  createdAt DateTime @default(now())
+}
